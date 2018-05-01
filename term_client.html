@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>chat</title>
+    <style>
+        /* 테이블과 이미지의 간격을 딱맞추기위해 0으로 초기화*/
+        table{
+            border:0px;
+            border-collapse:collapse;
+            border-spacing: 0;
+        }
+        img,tr,td{
+            width: 30px;
+            height: 30px;
+            margin: 0px;
+            padding: 0px;
+            line-height: 0px;
+        }
+        .fixed_div {
+            position:fixed;
+            bottom:0;
+            width:100%;
+            height:50px;
+            background:#ccc;
+            display: inline-block;
+        }
+    </style>
+
+  </head>
+  <body>
+
+  <!--<embed id="player" src="ab.mp3" autostart=true hidden=true loop=false type="audio/mp3">-->
+<form id = "btn">
+      <input type='button' value ="보드판 생성" id = "CBT" onclick = "CreateTable()">
+      <input type="text" value = "보드판 생성 버튼을 누르세요" id = "Info" size = "40">
+</form>
+      <hr>
+      <table border="2" style="border-color: black">
+          <tbody>
+          <tr>
+              <td id = "tab_par">
+                      <table id="tab">
+                      </table>
+              </td>
+          </tr>
+          </tbody>
+      </table>
+      <div style="font-size:2.0em; font-family: 궁서체" class="fixed_div" id = "fix"></div>
+      <div id="test"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script src=""></script>
+    <script>
+    var socket = io();
+
+    var Global_values = {
+    map_size:0,
+    ing: 0,
+    random_ing: 0,
+    random_check: 0,
+    eventSave: null,
+    isIntervalPlaying: 0,
+    head_location: "0.000",
+    tail_count: -1,
+    check: 0,
+    name_count: 2,
+    move: 0,
+    SleepTIme: 100,
+    bomb_count: 0,
+    fast_count: 0,
+    slow_count: 0,
+    long_count: 0,
+    temp: null
+};
+function bar_info() {
+    var bar = document.getElementById("fix");
+    bar.innerHTML = "<font color=#006400>몸 길이:"+(-Global_values.tail_count)+"</font>";
+    bar.innerHTML +="<font color=#000000> 폭탄:"+(Global_values.bomb_count)+"</font>";
+    bar.innerHTML +="<font color=#FF1493> 먹이:"+(Global_values.long_count)+"</font>";
+    bar.innerHTML +="<font color=#FF0000> Fast item:"+(Global_values.fast_count)+"</font>";
+    bar.innerHTML +="<font color=#0000FF> Slow item:"+(Global_values.slow_count)+"</font>";
+    bar.innerHTML +="<font color=#800080> Delay Speed:"+(Global_values.SleepTIme)+"</font>";
+    bar.innerHTML +="<font color=#000000> // P 입력시 일시정지</font>";
+}
+
+function Random_Create_Item() {
+    var random_time = Math.floor(Math.random() * 10);
+    switch(random_time){
+        case 1:
+            RandomItem("/long_item");
+            Global_values.long_count++;
+            break;
+        case 2:
+            RandomItem("/fast");
+            Global_values.fast_count++;
+            break;
+        case 3:
+            RandomItem("/slow");
+            Global_values.slow_count++;
+            break;
+        case 4:
+            RandomItem("/boom");
+            Global_values.bomb_count++;
+            break;
+        case 5:
+        case 6:
+        case 6:
+            RandomItem("/long_item");
+            Global_values.long_count++;
+            break;
+    }
+
+}
+
+function RandomItem(item) {
+    //x,y랜덤값 생성
+
+    while(true){
+        //생성된 위치에 아무거도 없을동안 반복 -> 겹치지 않게
+        var ran_x = Math.floor(Math.random() * Global_values.map_size);
+        var ran_y = Math.floor(Math.random() * Global_values.map_size);
+
+        //소숫점 만들기
+        if (ran_y < 10)
+            ran_y = ".00" + ran_y;
+        else if (ran_y < 100)
+            ran_y = ".0" + ran_y;
+        else
+            ran_y = "." + ran_y;
+
+        //합체
+        ran_x += ran_y;
+
+        var Long_Item = document.getElementById(ran_x + "");
+
+        //지금 위치에 아무거도 없을시 그자리에 그림 출력
+        if(Long_Item.innerHTML == '<img src="/blank">')
+            break;
+    }
+    Long_Item.innerHTML = '<img src='+item+'>';
+}
+
+//아이템을 먹었는지 검사
+function eat_item(head_point) {
+    var tail_point = null;
+
+    //꼬리 길어지는 아이템을 먹었을시
+    if(head_point.innerHTML == '<img src="/long_item">'){
+        Global_values.tail_count--;
+        Global_values.long_count--;
+    }
+    else {
+        //꼬리 길어지는 아이템을 안먹었을시 마지막꼬리 짜르기
+        tail_point = document.getElementsByName((Global_values.name_count + Global_values.tail_count) + "");
+        tail_point[0].innerHTML = "<img src='/blank'>";
+
+        //머리정보를 서버에 전송
+        socket.emit('move loc',(tail_point[0].id)+"","<img src='/blank'>");
+
+        //다른 클라이언트들의 머리정보를 서버로부터 가져옴
+        socket.on('moved loc', function(head_loc, imge){
+            var head_temp = document.getElementById(head_loc);
+            head_temp.innerHTML = imge;
+        });
+
+    }
+
+    //빨라지는 아이템을 먹었을시 속도증가
+    if(head_point.innerHTML == '<img src="/fast">'){
+        Global_values.fast_count--;
+        clearInterval(Global_values.ing);
+        Global_values.ing = setInterval("Start(Global_values.eventSave)", Global_values.SleepTIme-=10);
+    }
+
+    //느려지는 아이템을 먹었을시 속도 감소
+    if(head_point.innerHTML == '<img src="/slow">'){
+        Global_values.slow_count--;
+        clearInterval(Global_values.ing);
+        Global_values.ing = setInterval("Start(Global_values.eventSave)", Global_values.SleepTIme+=5);
+    }
+}
+
+ // 게임다시시작 버튼 눌렀을시
+  function Replay_Game() {
+    clearInterval(Global_values.ing);
+    clearInterval(Global_values.random_ing);
+
+           Global_values.ing                = 0;
+           Global_values.random_ing         = 0;
+           Global_values.random_check       = 0;
+           Global_values.eventSave          = null;
+           Global_values.isIntervalPlaying  = 0;
+           Global_values.head_location      = "0.000";
+           Global_values.check              = 0;
+           Global_values.move               = 0;
+           Global_values.SleepTIme          = 100;
+           Global_values.temp               =  null;
+           Global_values.tail_count --;
+           //삭제버튼 -> 시작버튼으로 변경
+           var Cre_BT = document.getElementById("DBT");
+           Cre_BT.setAttribute('value', '꼬리이어서 재참가');
+
+           //시작점 랜덤위치로 지정
+           var ran_1 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+           var ran_2 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+           if(Global_values.map_size<=10)
+               Global_values.head_location = ran_1+".00"+ran_2;
+           else if(Global_values.map_size<=100){
+             if(ran_2 < 10)
+               Global_values.head_location = ran_1+".00"+ran_2;
+             else
+               Global_values.head_location = ran_1+".0"+ran_2;
+             }
+           else
+               Global_values.head_location = ran_1+"."+ran_2;
+
+             //머리부분 출력
+             var Create_First = document.getElementById(Global_values.head_location+"");
+               Create_First.innerHTML = "<img src='/head'>";
+               Create_First.setAttribute('name', (++Global_values.name_count)+"");
+
+
+               //머리정보를 서버에 전송
+               socket.emit('move loc',Global_values.head_location,"<img src='/head'>");
+
+               //다른 클라이언트들의 머리정보를 서버로부터 가져옴
+               socket.on('moved loc', function(head_loc, imge){
+                   var head_temp = document.getElementById(head_loc+"");
+                   head_temp.innerHTML = imge;
+               });
+
+               //시작화면을 중앙으로 전환 - 현재 window의 가로 세로길이를 구하여 중앙으로
+               var offset = $(Create_First).offset();
+               offset.left -= (window.innerWidth/2);
+               offset.top -= (window.innerHeight/2-90);
+               $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
+    }
+
+    function CreateTable() {
+    //테이블 동적생성
+    var Table_par = document.getElementById("tab_par");
+    var Get_Table = document.getElementById("tab");
+
+    //보드판 생성시 한번 테이블을 지우고 새로 생성
+    if(Table_par != null)
+    Table_par.children[0].remove(this);
+
+    var Create_TAB = document.createElement("table");
+    var Create_TR = document.createElement("TR");
+    var Create_TD = document.createElement("TD");
+
+    Create_TAB.id="tab";
+    Global_values.check = 0;
+    //삭제된 테이블을 추가하고 생성된 테이블의 id값을 추가
+
+    //입력 받은 사이즈만큼 A*A 길이 생성
+    for(var i = 0; i<Global_values.map_size; i++) {
+        Create_TR = document.createElement("TR");
+        for (var j = 0; j < Global_values.map_size; j++) {
+            Create_TD = document.createElement("TD");
+            Create_TD.innerHTML = '<img src="/blank">';
+            if(j<10)
+                Create_TD.setAttribute('id',i+".00"+j);
+            else if(j<100)
+                Create_TD.setAttribute('id',i+".0"+j);
+            else
+                Create_TD.setAttribute('id',i+"."+j);
+            Create_TR.appendChild(Create_TD);
+            Create_TAB.appendChild(Create_TR);
+        }
+
+        //테이블에 적용
+        Table_par.appendChild(Create_TAB);
+        Global_values.temp = Get_Table;
+    }
+
+    //아이템 생성
+    for(var i = 0; i<Global_values.map_size/3; i++) {
+        RandomItem("/long_item");
+        Global_values.long_count++;
+        RandomItem("/boom");
+        Global_values.bomb_count++;
+    }
+    for(var i = 0; i<Global_values.map_size/5; i++){
+        RandomItem("/fast");
+        Global_values.fast_count++;
+        RandomItem("/slow");
+        Global_values.slow_count++;
+    }
+
+    //시작버튼 -> 삭제버튼으로 변경
+    var Cre_BT = document.getElementById("CBT");
+    Cre_BT.setAttribute('value', '다시하기');
+    Cre_BT.setAttribute('onclick', 'Replay_Game()');
+    Cre_BT.setAttribute('id', 'DBT');
+
+    //다음 설명 적기
+    var info = document.getElementById("Info");
+    info.setAttribute('value','방향키를 누를시 게임시작/ P키 누를시 일시정지');
+
+  //테이블을 서버에게 넘겨주는 과정
+  var origin_table = document.getElementById("tab");
+  socket.emit('crt table',toJSON(origin_table), Global_values.map_size);
+
+  //서버로부터 테이블을 받는 과정
+  socket.on('created table', function (cr_tab, input_e) {
+  cr_tab = toDOM(cr_tab);
+  var Get_Table = document.getElementById("tab_par");
+  var child_Table = document.getElementById("tab");
+
+  //맵크기를 다른 클라이언트랑 동기화
+  Global_values.map_size = input_e;
+
+  if(child_Table != null){
+    Get_Table.removeChild(child_Table);
+    Get_Table.appendChild(cr_tab);
+  }
+
+  //시작점 랜덤위치로 지정
+  var ran_1 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+  var ran_2 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+  if(Global_values.map_size<=10)
+      Global_values.head_location = ran_1+".00"+ran_2;
+  else if(Global_values.map_size<=100){
+    if(ran_2 < 10)
+      Global_values.head_location = ran_1+".00"+ran_2;
+    else
+      Global_values.head_location = ran_1+".0"+ran_2;
+    }
+  else
+      Global_values.head_location = ran_1+"."+ran_2;
+
+    //머리부분 출력
+    var Create_First = document.getElementById(Global_values.head_location+"");
+      Create_First.innerHTML = "<img src='/head'>";
+      Create_First.setAttribute('name', (++Global_values.name_count)+"");
+
+
+      //머리정보를 서버에 전송
+      socket.emit('move loc',Global_values.head_location,"<img src='/head'>");
+
+      //다른 클라이언트들의 머리정보를 서버로부터 가져옴
+      socket.on('moved loc', function(head_loc, imge){
+          var head_temp = document.getElementById(head_loc+"");
+          head_temp.innerHTML = imge;
+      });
+
+
+      //시작화면을 중앙으로 전환 - 현재 window의 가로 세로길이를 구하여 중앙으로
+      var offset = $(Create_First).offset();
+      offset.left -= (window.innerWidth/2);
+      offset.top -= (window.innerHeight/2-90);
+      $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
+
+});
+
+//맨밑 바 정보 출력
+bar_info();
+}
+      //맵 사이즈 정하기
+      while(true) {
+        Global_values.map_size = prompt("가로*세로 길이를 입력하세요(2-150) @@ 권장:20 @@");
+        if(Global_values.map_size>=2 && Global_values.map_size<=150){
+          socket.emit('map size', Global_values.map_size);
+          CreateTable(Global_values.map_size);
+          break;
+        }
+      }
+
+      window.onkeydown = function (event) {
+          var testKeycode = document.getElementById("test");
+          testKeycode.innerHTML = event.keyCode; // 주석 제거시 현재 진행방향 표시
+
+          var check_BT = document.getElementById("DBT");
+          if((event.keyCode=='37' || event.keyCode=='38'|| event.keyCode=='39'|| event.keyCode=='40' || event.keyCode == '80')
+              && check_BT != null) {
+              Global_values.eventSave = event;
+              //event가 다른 함수로 넘어갈경우 값이 사라져서 변수선언해서 잡아 놓음
+              //또한, 다른 키 입력시 바뀌는값을 Interval함수에 넘겨줌
+
+              if(Global_values.isIntervalPlaying == 0) {
+                  //2번째인자값ms마다 Start 함수 실행, 최초 한번만 Interval호출(여러개호출 방지)
+                  Global_values.ing = setInterval("Start(Global_values.eventSave)", Global_values.SleepTIme);
+                  Global_values.isIntervalPlaying = 1;
+              }
+          }
+      }
+
+
+//매ms마다 실행될 함수
+function Start(event) {
+    var fir =  parseInt(Global_values.head_location);
+    var sec =  Math.round((parseFloat(Global_values.head_location)-parseInt(fir))*1000);
+
+    var check_BT = document.getElementById("DBT");
+    var head_point = document.getElementById(Global_values.head_location+"");
+
+    //하단바 값 최신화
+    bar_info();
+
+
+    if(check_BT == null || event.keyCode == 80){
+        //게임도중 삭제버튼을 누를시 실행 종료
+        clearInterval(Global_values.ing);
+        clearInterval(Global_values.random_ing);
+        Global_values.isIntervalPlaying = 0;
+        Global_values.random_check = 0;
+        return;
+    }
+
+    //이전키가 P(Stop)키를 눌렀으면 랜덤생성쓰레드 run
+    if(Global_values.move.keyCode == 80 || Global_values.random_check == 0){
+        Global_values.random_ing = setInterval("Random_Create_Item()", 1000);
+        Global_values.random_check = 1;
+    }
+
+    //check로 버튼눌렀을시 실행되는것을 제어
+    //현재키와 이전키가 정반대 키를 눌렀을시: 현재키 <= 이전키
+    if(Global_values.check!=1) {
+        if(Global_values.move != null) {
+            if (Global_values.move.keyCode  == 37) {
+                if (event.keyCode == 39) {
+                    event = Global_values.move;
+                }
+            }
+            else if (Global_values.move.keyCode  == 38) {
+                if (event.keyCode == 40) {
+                    event = Global_values.move;
+                }
+            } else if (Global_values.move.keyCode  == 39) {
+                if (event.keyCode == 37) {
+                    event = Global_values.move;
+                }
+
+            } else if (Global_values.move.keyCode  == 40) {
+                if (event.keyCode == 38) {
+                    event = Global_values.move;
+                }
+            }
+        }
+
+
+        //화면 자동 조절 - 현재 window의 가로 세로길이를 구하여 중앙으로
+        var offset = $(head_point).offset();
+        offset.left -= (window.innerWidth/2);
+        offset.top -= (window.innerHeight/2-90);
+
+        //예외 발생시 GameOver
+        try {
+            head_point.innerHTML = "<img src='/tail'>";
+
+            //꼬리정보를 서버에 전송
+            socket.emit('move loc',Global_values.head_location,"<img src='/tail'>");
+
+            //다른 클라이언트들의 머리정보를 서버로부터 가져옴
+            socket.on('moved loc', function(head_loc, imge){
+                var head_temp = document.getElementById(head_loc+"");
+                head_temp.innerHTML = imge;
+            });
+
+            switch (event.keyCode) {
+                //←
+                case 37:
+                    Global_values.head_location = (parseFloat(Global_values.head_location) - 0.001).toFixed(3);
+                    head_point = document.getElementById(Global_values.head_location + "");
+                    //각 case의 offset 설정은 도중 다른화살표 입력시 화면흔들림을 줄여준다.
+                    offset.left -= 30;
+                    break;
+                //↑
+                case 38:
+                    Global_values.head_location = (parseFloat(Global_values.head_location) - 1.000).toFixed(3);
+                    head_point = document.getElementById(Global_values.head_location + "");
+                    offset.top -= 30;
+                    break;
+                //→
+                case 39:
+                    Global_values.head_location = (parseFloat(Global_values.head_location) + 0.001).toFixed(3);
+                    head_point = document.getElementById(Global_values.head_location + "");
+                  offset.left += 30;
+                    break;
+                //↓
+                case 40:
+                    Global_values.head_location = (parseFloat(Global_values.head_location) + 1.000).toFixed(3);
+                    head_point = document.getElementById(Global_values.head_location + "");
+                    offset.top += 30;
+                    break;
+            }
+            Global_values.move = event;
+            //이번에 밟은 땅이 벽이나 몸통,폭탄이면 에러발생
+            if(head_point.innerHTML == '<img src="/head">' ||
+                head_point.innerHTML == '<img src="/tail">' ||
+                head_point.innerHTML == '<img src="/boom">' ||
+                head_point.innerHTML == null
+            ){
+                throw "E";
+            }
+            //플레이어가 움직인 위치정보를 중복없이 각<td>의 name속성에 저장
+            head_point.setAttribute('name', (++Global_values.name_count)+"");
+            //아이템을 먹었는지 검사
+            eat_item(head_point);
+
+            //이번에 밟은 땅이 벽이나 몸통이 아니면 머리 생성
+            head_point.innerHTML = '<img src="/head">';
+            //현재 화면을 머리의 중앙으로 이동(이동시간 0초 지정)
+            $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
+
+            //머리정보를 서버에 전송
+            socket.emit('move loc',Global_values.head_location,"<img src='/head'>");
+
+            //다른 클라이언트들의 머리정보를 서버로부터 가져옴
+            socket.on('moved loc', function(head_loc, imge){
+                var head_temp = document.getElementById(head_loc+"");
+                head_temp.innerHTML = imge;
+            });
+
+        }catch(exception){
+            alert("Game Over");
+            clearInterval(Global_values.ing);
+            clearInterval(Global_values.random_ing);
+
+            //GameOver만족시 쓰레드 전부 종료
+            Global_values.isIntervalPlaying = 1;
+            Global_values.random_check = 1;
+            return;
+        }
+    }
+}
+
+
+//--------------객체를 서버로 넘기기위한 JSON 사용 ----------------------
+      function toJSON(node) {
+        node = node || this;
+        var obj = {
+          nodeType: node.nodeType
+        };
+        if (node.tagName) {
+          obj.tagName = node.tagName.toLowerCase();
+        } else
+        if (node.nodeName) {
+          obj.nodeName = node.nodeName;
+        }
+        if (node.nodeValue) {
+          obj.nodeValue = node.nodeValue;
+        }
+        var attrs = node.attributes;
+        if (attrs) {
+          var length = attrs.length;
+          var arr = obj.attributes = new Array(length);
+          for (var i = 0; i < length; i++) {
+            attr = attrs[i];
+            arr[i] = [attr.nodeName, attr.nodeValue];
+          }
+        }
+        var childNodes = node.childNodes;
+        if (childNodes) {
+          length = childNodes.length;
+          arr = obj.childNodes = new Array(length);
+          for (i = 0; i < length; i++) {
+            arr[i] = toJSON(childNodes[i]);
+          }
+        }
+        return obj;
+}
+
+function toDOM(obj) {
+  if (typeof obj == 'string') {
+    obj = JSON.parse(obj);
+  }
+  var node, nodeType = obj.nodeType;
+  switch (nodeType) {
+    case 1: //ELEMENT_NODE
+      node = document.createElement(obj.tagName);
+      var attributes = obj.attributes || [];
+      for (var i = 0, len = attributes.length; i < len; i++) {
+        var attr = attributes[i];
+        node.setAttribute(attr[0], attr[1]);
+      }
+      break;
+    case 3: //TEXT_NODE
+      node = document.createTextNode(obj.nodeValue);
+      break;
+    case 8: //COMMENT_NODE
+      node = document.createComment(obj.nodeValue);
+      break;
+    case 9: //DOCUMENT_NODE
+      node = document.implementation.createDocument();
+      break;
+    case 10: //DOCUMENT_TYPE_NODE
+      node = document.implementation.createDocumentType(obj.nodeName);
+      break;
+    case 11: //DOCUMENT_FRAGMENT_NODE
+      node = document.createDocumentFragment();
+      break;
+    default:
+      return node;
+  }
+  if (nodeType == 1 || nodeType == 11) {
+    var childNodes = obj.childNodes || [];
+    for (i = 0, len = childNodes.length; i < len; i++) {
+      node.appendChild(toDOM(childNodes[i]));
+    }
+  }
+  return node;
+}
+    </script>
+  </body>
+</html>
