@@ -3,13 +3,20 @@
   <head>
     <meta charset="utf-8">
     <title>chat</title>
+
     <style>
         /* 테이블과 이미지의 간격을 딱맞추기위해 0으로 초기화*/
+        body{
+          margin: 1px;
+          padding: 1px;
+        }
+
         table{
             border:0px;
             border-collapse:collapse;
-            border-spacing: 0;
+            border-spacing: 0px;
         }
+
         img,tr,td{
             width: 30px;
             height: 30px;
@@ -17,7 +24,8 @@
             padding: 0px;
             line-height: 0px;
         }
-        .fixed_div {
+
+        .fixed_div{
             position:fixed;
             bottom:0;
             width:100%;
@@ -25,6 +33,16 @@
             background:#ccc;
             display: inline-block;
         }
+
+        #DBT{
+            position:fixed;
+            top:0;
+            width::100%;
+            height:25px;
+            background:#ccc;
+            display: inline-block;
+        }
+
     </style>
 
   </head>
@@ -32,10 +50,11 @@
 
   <!--<embed id="player" src="ab.mp3" autostart=true hidden=true loop=false type="audio/mp3">-->
 <form id = "btn">
-      <input type='button' value ="보드판 생성" id = "CBT" onclick = "CreateTable()">
-      <input type="text" value = "보드판 생성 버튼을 누르세요" id = "Info" size = "40">
+      <input type='button' id = "CBT"  onclick = "CreateTable()">
+      <input type="text"   id = "Info" size    = "60" style = "text-align:right;" readonly>
 </form>
       <hr>
+
       <table border="2" style="border-color: black">
           <tbody>
           <tr>
@@ -46,66 +65,88 @@
           </tr>
           </tbody>
       </table>
+
       <div style="font-size:2.0em; font-family: 궁서체" class="fixed_div" id = "fix"></div>
-      <div id="test"></div>
+      <div id="test">赤い自覚があなた</div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
-    <script src=""></script>
-    <script>
-    var socket = io();
 
+    <script>
+
+    //키보드로부터 화살표를 칠시, 스크롤되는것을 막는 구문
+$('html').css({'overflow': 'hidden', 'height': '100%'});
+$('#element').on('scroll', function(event) {
+    event.preventDefault();
+    //스크롤시 Prevent 한다
+    return false;
+});
+
+    //io 통신을 위해 함수 호출
+    var socket        = io();
+
+    //전역변수 선언
     var Global_values = {
-    map_size:0,
-    ing: 0,
-    random_ing: 0,
-    random_check: 0,
-    eventSave: null,
-    isIntervalPlaying: 0,
-    head_location: "0.000",
-    tail_count: -1,
-    check: 0,
-    name_count: 2,
-    move: 0,
-    SleepTIme: 100,
-    bomb_count: 0,
-    fast_count: 0,
-    slow_count: 0,
-    long_count: 0,
-    temp: null
+    map_size          :0,
+    ing               : 0,
+    random_ing        : 0,
+    random_check      : 0,
+    eventSave         : null,
+    isIntervalPlaying : 0,
+    head_location     : "0.000",
+    tail_count        : -1,
+    check             : 0,
+    name_count        : 2,
+    move              : 0,
+    SleepTIme         : 120,
+    bomb_count        : 0,
+    fast_count        : 0,
+    slow_count        : 0,
+    long_count        : 0,
+    temp              : null,
+    replay_check      : 1
 };
+
+//맨 밑 정보창
 function bar_info() {
     var bar = document.getElementById("fix");
-    bar.innerHTML = "<font color=#006400>몸 길이:"+(-Global_values.tail_count)+"</font>";
-    bar.innerHTML +="<font color=#000000> 폭탄:"+(Global_values.bomb_count)+"</font>";
-    bar.innerHTML +="<font color=#FF1493> 먹이:"+(Global_values.long_count)+"</font>";
+    bar.innerHTML = "<font color=#006400>長さ:"+(-Global_values.tail_count)+"</font>";
+    bar.innerHTML +="<font color=#000000> 爆弾:"+(Global_values.bomb_count)+"</font>";
+    bar.innerHTML +="<font color=#FF1493> 餌:"+(Global_values.long_count)+"</font>";
     bar.innerHTML +="<font color=#FF0000> Fast item:"+(Global_values.fast_count)+"</font>";
     bar.innerHTML +="<font color=#0000FF> Slow item:"+(Global_values.slow_count)+"</font>";
     bar.innerHTML +="<font color=#800080> Delay Speed:"+(Global_values.SleepTIme)+"</font>";
-    bar.innerHTML +="<font color=#000000> // P 입력시 일시정지</font>";
+    bar.innerHTML +="<font color=#000000> // P 入力し一時停止</font>";
 }
 
+//랜덤 아이템 생성
 function Random_Create_Item() {
-    var random_time = Math.floor(Math.random() * 10);
+    //12분의 n확률로 아이템 비율 조절
+    var random_time = Math.floor(Math.random() * 12);
+
+    //아이템 비율 조절 n/12
     switch(random_time){
         case 1:
             RandomItem("/long_item");
             Global_values.long_count++;
             break;
+
         case 2:
             RandomItem("/fast");
             Global_values.fast_count++;
             break;
+
         case 3:
             RandomItem("/slow");
             Global_values.slow_count++;
             break;
+
         case 4:
-            RandomItem("/boom");
-            Global_values.bomb_count++;
+            //RandomItem("/boom");
+            //Global_values.bomb_count++;
             break;
+
         case 5:
-        case 6:
         case 6:
             RandomItem("/long_item");
             Global_values.long_count++;
@@ -114,8 +155,8 @@ function Random_Create_Item() {
 
 }
 
+//x,y랜덤값 생성
 function RandomItem(item) {
-    //x,y랜덤값 생성
 
     while(true){
         //생성된 위치에 아무거도 없을동안 반복 -> 겹치지 않게
@@ -132,16 +173,40 @@ function RandomItem(item) {
 
         //합체
         ran_x += ran_y;
-
         var Long_Item = document.getElementById(ran_x + "");
 
         //지금 위치에 아무거도 없을시 그자리에 그림 출력
         if(Long_Item.innerHTML == '<img src="/blank">')
             break;
     }
+
     Long_Item.innerHTML = '<img src='+item+'>';
 }
 
+//게임에서 죽었을 시, 모든 몸통,꼬리 제거
+function game_over_remove_tail(head_point){
+
+  //죽은애 모든 정보 삭제
+  var tail_point = null;
+
+    while(true){
+    //꼬리 길어지는 아이템을 안먹었을시 마지막꼬리 짜르기
+    tail_point = document.getElementsByName((Global_values.name_count + Global_values.tail_count) + "");
+
+    if(tail_point[0] == undefined){
+      //꼬리를 다지웠을 함수 종료
+      return ;
+    }
+
+    tail_point[0].innerHTML = "<img src='/blank'>";
+
+    //머리정보를 서버에 전송
+    socket.emit('move loc',(tail_point[0].id)+"","<img src='/blank'>");
+
+    Global_values.name_count++;
+  }
+
+}
 //아이템을 먹었는지 검사
 function eat_item(head_point) {
     var tail_point = null;
@@ -151,20 +216,13 @@ function eat_item(head_point) {
         Global_values.tail_count--;
         Global_values.long_count--;
     }
+
+    //꼬리 길어지는 아이템을 안먹었을시 마지막꼬리 짜르기
     else {
-        //꼬리 길어지는 아이템을 안먹었을시 마지막꼬리 짜르기
         tail_point = document.getElementsByName((Global_values.name_count + Global_values.tail_count) + "");
         tail_point[0].innerHTML = "<img src='/blank'>";
-
-        //머리정보를 서버에 전송
+        //꼬리정보를 서버에 전송
         socket.emit('move loc',(tail_point[0].id)+"","<img src='/blank'>");
-
-        //다른 클라이언트들의 머리정보를 서버로부터 가져옴
-        socket.on('moved loc', function(head_loc, imge){
-            var head_temp = document.getElementById(head_loc);
-            head_temp.innerHTML = imge;
-        });
-
     }
 
     //빨라지는 아이템을 먹었을시 속도증가
@@ -180,14 +238,19 @@ function eat_item(head_point) {
         clearInterval(Global_values.ing);
         Global_values.ing = setInterval("Start(Global_values.eventSave)", Global_values.SleepTIme+=5);
     }
+
 }
 
  // 게임다시시작 버튼 눌렀을시
   function Replay_Game() {
-    clearInterval(Global_values.ing);
-    clearInterval(Global_values.random_ing);
+    if(Global_values.replay_check == 0){
+      Global_values.replay_check = 1;
 
-           Global_values.ing                = 0;
+      //돌던 쓰레드들 전부 종료
+      clearInterval(Global_values.ing);
+      clearInterval(Global_values.random_ing);
+
+           Global_values.ing                = null;
            Global_values.random_ing         = 0;
            Global_values.random_check       = 0;
            Global_values.eventSave          = null;
@@ -195,24 +258,31 @@ function eat_item(head_point) {
            Global_values.head_location      = "0.000";
            Global_values.check              = 0;
            Global_values.move               = 0;
-           Global_values.SleepTIme          = 100;
-           Global_values.temp               =  null;
-           Global_values.tail_count --;
+           Global_values.temp               = null;
+           Global_values.tail_count         = -1;
+           Global_values.SleepTIme          = 120;
+
            //삭제버튼 -> 시작버튼으로 변경
            var Cre_BT = document.getElementById("DBT");
-           Cre_BT.setAttribute('value', '꼬리이어서 재참가');
+           Cre_BT.setAttribute('value', 'リトライ ');
 
            //시작점 랜덤위치로 지정
            var ran_1 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
            var ran_2 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+
            if(Global_values.map_size<=10)
                Global_values.head_location = ran_1+".00"+ran_2;
+
            else if(Global_values.map_size<=100){
+
              if(ran_2 < 10)
                Global_values.head_location = ran_1+".00"+ran_2;
+
              else
                Global_values.head_location = ran_1+".0"+ran_2;
+
              }
+
            else
                Global_values.head_location = ran_1+"."+ran_2;
 
@@ -221,15 +291,8 @@ function eat_item(head_point) {
                Create_First.innerHTML = "<img src='/head'>";
                Create_First.setAttribute('name', (++Global_values.name_count)+"");
 
-
                //머리정보를 서버에 전송
-               socket.emit('move loc',Global_values.head_location,"<img src='/head'>");
-
-               //다른 클라이언트들의 머리정보를 서버로부터 가져옴
-               socket.on('moved loc', function(head_loc, imge){
-                   var head_temp = document.getElementById(head_loc+"");
-                   head_temp.innerHTML = imge;
-               });
+               socket.emit('move loc',Global_values.head_location,"<img src='/my_head'>");
 
                //시작화면을 중앙으로 전환 - 현재 window의 가로 세로길이를 구하여 중앙으로
                var offset = $(Create_First).offset();
@@ -237,9 +300,10 @@ function eat_item(head_point) {
                offset.top -= (window.innerHeight/2-90);
                $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
     }
+  }
 
-    function CreateTable() {
     //테이블 동적생성
+    function CreateTable() {
     var Table_par = document.getElementById("tab_par");
     var Get_Table = document.getElementById("tab");
 
@@ -253,20 +317,25 @@ function eat_item(head_point) {
 
     Create_TAB.id="tab";
     Global_values.check = 0;
-    //삭제된 테이블을 추가하고 생성된 테이블의 id값을 추가
 
+    //삭제된 테이블을 추가하고 생성된 테이블의 id값을 추가
     //입력 받은 사이즈만큼 A*A 길이 생성
     for(var i = 0; i<Global_values.map_size; i++) {
         Create_TR = document.createElement("TR");
+
         for (var j = 0; j < Global_values.map_size; j++) {
             Create_TD = document.createElement("TD");
             Create_TD.innerHTML = '<img src="/blank">';
+
             if(j<10)
                 Create_TD.setAttribute('id',i+".00"+j);
+
             else if(j<100)
                 Create_TD.setAttribute('id',i+".0"+j);
+
             else
                 Create_TD.setAttribute('id',i+"."+j);
+
             Create_TR.appendChild(Create_TD);
             Create_TAB.appendChild(Create_TR);
         }
@@ -283,6 +352,7 @@ function eat_item(head_point) {
         RandomItem("/boom");
         Global_values.bomb_count++;
     }
+
     for(var i = 0; i<Global_values.map_size/5; i++){
         RandomItem("/fast");
         Global_values.fast_count++;
@@ -292,88 +362,40 @@ function eat_item(head_point) {
 
     //시작버튼 -> 삭제버튼으로 변경
     var Cre_BT = document.getElementById("CBT");
-    Cre_BT.setAttribute('value', '다시하기');
+    Cre_BT.setAttribute('value', 'リトライ');
     Cre_BT.setAttribute('onclick', 'Replay_Game()');
     Cre_BT.setAttribute('id', 'DBT');
 
     //다음 설명 적기
     var info = document.getElementById("Info");
-    info.setAttribute('value','방향키를 누를시 게임시작/ P키 누를시 일시정지');
+    info.setAttribute('value','方向キーを押すとゲームスタート/Pキーを押すと一時停止');
 
   //테이블을 서버에게 넘겨주는 과정
   var origin_table = document.getElementById("tab");
   socket.emit('crt table',toJSON(origin_table), Global_values.map_size);
 
-  //서버로부터 테이블을 받는 과정
-  socket.on('created table', function (cr_tab, input_e) {
-  cr_tab = toDOM(cr_tab);
-  var Get_Table = document.getElementById("tab_par");
-  var child_Table = document.getElementById("tab");
-
-  //맵크기를 다른 클라이언트랑 동기화
-  Global_values.map_size = input_e;
-
-  if(child_Table != null){
-    Get_Table.removeChild(child_Table);
-    Get_Table.appendChild(cr_tab);
-  }
-
-  //시작점 랜덤위치로 지정
-  var ran_1 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
-  var ran_2 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
-  if(Global_values.map_size<=10)
-      Global_values.head_location = ran_1+".00"+ran_2;
-  else if(Global_values.map_size<=100){
-    if(ran_2 < 10)
-      Global_values.head_location = ran_1+".00"+ran_2;
-    else
-      Global_values.head_location = ran_1+".0"+ran_2;
-    }
-  else
-      Global_values.head_location = ran_1+"."+ran_2;
-
-    //머리부분 출력
-    var Create_First = document.getElementById(Global_values.head_location+"");
-      Create_First.innerHTML = "<img src='/head'>";
-      Create_First.setAttribute('name', (++Global_values.name_count)+"");
-
-
-      //머리정보를 서버에 전송
-      socket.emit('move loc',Global_values.head_location,"<img src='/head'>");
-
-      //다른 클라이언트들의 머리정보를 서버로부터 가져옴
-      socket.on('moved loc', function(head_loc, imge){
-          var head_temp = document.getElementById(head_loc+"");
-          head_temp.innerHTML = imge;
-      });
-
-
-      //시작화면을 중앙으로 전환 - 현재 window의 가로 세로길이를 구하여 중앙으로
-      var offset = $(Create_First).offset();
-      offset.left -= (window.innerWidth/2);
-      offset.top -= (window.innerHeight/2-90);
-      $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
-
-});
-
 //맨밑 바 정보 출력
 bar_info();
 }
+
       //맵 사이즈 정하기
       while(true) {
-        Global_values.map_size = prompt("가로*세로 길이를 입력하세요(2-150) @@ 권장:20 @@");
+        Global_values.map_size = prompt("横*縦 サイズを入力してください(2-150) @@ 進め:20 @@");
+
         if(Global_values.map_size>=2 && Global_values.map_size<=150){
           socket.emit('map size', Global_values.map_size);
           CreateTable(Global_values.map_size);
           break;
         }
+
       }
 
+      //키를 눌렀을 경우,
       window.onkeydown = function (event) {
           var testKeycode = document.getElementById("test");
-          testKeycode.innerHTML = event.keyCode; // 주석 제거시 현재 진행방향 표시
-
+          //testKeycode.innerHTML = event.keyCode; // 주석 제거시 현재 진행방향 표시
           var check_BT = document.getElementById("DBT");
+
           if((event.keyCode=='37' || event.keyCode=='38'|| event.keyCode=='39'|| event.keyCode=='40' || event.keyCode == '80')
               && check_BT != null) {
               Global_values.eventSave = event;
@@ -385,21 +407,19 @@ bar_info();
                   Global_values.ing = setInterval("Start(Global_values.eventSave)", Global_values.SleepTIme);
                   Global_values.isIntervalPlaying = 1;
               }
+
           }
       }
 
-
 //매ms마다 실행될 함수
 function Start(event) {
-    var fir =  parseInt(Global_values.head_location);
-    var sec =  Math.round((parseFloat(Global_values.head_location)-parseInt(fir))*1000);
-
-    var check_BT = document.getElementById("DBT");
-    var head_point = document.getElementById(Global_values.head_location+"");
+    var fir         =  parseInt(Global_values.head_location);
+    var sec         =  Math.round((parseFloat(Global_values.head_location)-parseInt(fir))*1000);
+    var check_BT    = document.getElementById("DBT");
+    var head_point  = document.getElementById(Global_values.head_location+"");
 
     //하단바 값 최신화
     bar_info();
-
 
     if(check_BT == null || event.keyCode == 80){
         //게임도중 삭제버튼을 누를시 실행 종료
@@ -412,7 +432,7 @@ function Start(event) {
 
     //이전키가 P(Stop)키를 눌렀으면 랜덤생성쓰레드 run
     if(Global_values.move.keyCode == 80 || Global_values.random_check == 0){
-        Global_values.random_ing = setInterval("Random_Create_Item()", 1000);
+        Global_values.random_ing = setInterval("Random_Create_Item()", Global_values.SleepTIme*5);
         Global_values.random_check = 1;
     }
 
@@ -433,14 +453,12 @@ function Start(event) {
                 if (event.keyCode == 37) {
                     event = Global_values.move;
                 }
-
             } else if (Global_values.move.keyCode  == 40) {
                 if (event.keyCode == 38) {
                     event = Global_values.move;
                 }
             }
         }
-
 
         //화면 자동 조절 - 현재 window의 가로 세로길이를 구하여 중앙으로
         var offset = $(head_point).offset();
@@ -450,15 +468,8 @@ function Start(event) {
         //예외 발생시 GameOver
         try {
             head_point.innerHTML = "<img src='/tail'>";
-
             //꼬리정보를 서버에 전송
             socket.emit('move loc',Global_values.head_location,"<img src='/tail'>");
-
-            //다른 클라이언트들의 머리정보를 서버로부터 가져옴
-            socket.on('moved loc', function(head_loc, imge){
-                var head_temp = document.getElementById(head_loc+"");
-                head_temp.innerHTML = imge;
-            });
 
             switch (event.keyCode) {
                 //←
@@ -487,47 +498,114 @@ function Start(event) {
                     offset.top += 30;
                     break;
             }
+
             Global_values.move = event;
+
             //이번에 밟은 땅이 벽이나 몸통,폭탄이면 에러발생
-            if(head_point.innerHTML == '<img src="/head">' ||
+            if(head_point.innerHTML == '<img src="/my_head">' ||
                 head_point.innerHTML == '<img src="/tail">' ||
                 head_point.innerHTML == '<img src="/boom">' ||
                 head_point.innerHTML == null
             ){
                 throw "E";
             }
+
             //플레이어가 움직인 위치정보를 중복없이 각<td>의 name속성에 저장
             head_point.setAttribute('name', (++Global_values.name_count)+"");
+
             //아이템을 먹었는지 검사
             eat_item(head_point);
 
             //이번에 밟은 땅이 벽이나 몸통이 아니면 머리 생성
             head_point.innerHTML = '<img src="/head">';
+
             //현재 화면을 머리의 중앙으로 이동(이동시간 0초 지정)
             $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
 
             //머리정보를 서버에 전송
-            socket.emit('move loc',Global_values.head_location,"<img src='/head'>");
-
-            //다른 클라이언트들의 머리정보를 서버로부터 가져옴
-            socket.on('moved loc', function(head_loc, imge){
-                var head_temp = document.getElementById(head_loc+"");
-                head_temp.innerHTML = imge;
-            });
+            socket.emit('move loc',Global_values.head_location,"<img src='/my_head'>");
 
         }catch(exception){
+          //죽은 유저의 모든 몸통삭제
+          game_over_remove_tail(document.getElementById(Global_values.head_location + ""));
             alert("Game Over");
+            Global_values.replay_check = 0;
             clearInterval(Global_values.ing);
             clearInterval(Global_values.random_ing);
-
             //GameOver만족시 쓰레드 전부 종료
             Global_values.isIntervalPlaying = 1;
             Global_values.random_check = 1;
             return;
         }
+
     }
 }
+//다른 클라이언트들의 위치 정보를 서버로부터 가져옴
+socket.on('moved loc', function(head_loc, imge){
+    var head_temp = document.getElementById(head_loc+"");
+    head_temp.innerHTML = imge;
+});
 
+//서버로부터 테이블을 받는 과정
+socket.on('created table', function (cr_tab, input_e) {
+  clearInterval(Global_values.ing);
+  clearInterval(Global_values.random_ing);
+
+  Global_values.isIntervalPlaying = 0;
+  Global_values.random_check      = 0;
+  Global_values.move              = 0;
+  Global_values.ing               = null;
+  Global_values.tail_count        = -1;
+
+cr_tab = toDOM(cr_tab);
+var Get_Table = document.getElementById("tab_par");
+var child_Table = document.getElementById("tab");
+
+//맵크기를 다른 클라이언트랑 동기화
+Global_values.map_size = input_e;
+if(child_Table != null){
+  Get_Table.removeChild(child_Table);
+  Get_Table.appendChild(cr_tab);
+}
+
+//시작점 랜덤위치로 지정
+while(true){
+var ran_1 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+var ran_2 =  parseInt(Math.floor(Math.random()* Global_values.map_size))+"";
+
+if(Global_values.map_size<=10)
+    Global_values.head_location = ran_1+".00"+ran_2;
+
+else if(Global_values.map_size<=100){
+
+  if(ran_2 < 10)
+    Global_values.head_location = ran_1+".00"+ran_2;
+  else
+    Global_values.head_location = ran_1+".0"+ran_2;
+
+  }
+
+else
+    Global_values.head_location = ran_1+"."+ran_2;
+
+    var Create_First = document.getElementById(Global_values.head_location+"");
+    if(Create_First.innerHTML == '<img src="/blank">')
+      break;
+  }
+
+  //머리부분 출력
+    Create_First.innerHTML = "<img src='/head'>";
+    Create_First.setAttribute('name', (++Global_values.name_count)+"");
+
+    //머리정보를 서버에 전송
+    socket.emit('move loc',Global_values.head_location,"<img src='/my_head'>");
+
+    //시작화면을 중앙으로 전환 - 현재 window의 가로 세로길이를 구하여 중앙으로
+    var offset = $(Create_First).offset();
+    offset.left -= (window.innerWidth/2);
+    offset.top -= (window.innerHeight/2-90);
+    $('html, body').animate({scrollLeft : offset.left, scrollTop : offset.top},0);
+});
 
 //--------------객체를 서버로 넘기기위한 JSON 사용 ----------------------
       function toJSON(node) {
@@ -563,7 +641,6 @@ function Start(event) {
         }
         return obj;
 }
-
 function toDOM(obj) {
   if (typeof obj == 'string') {
     obj = JSON.parse(obj);

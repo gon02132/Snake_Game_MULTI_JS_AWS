@@ -1,0 +1,5 @@
+0. git bash -> nodemon download
+1.gitbash -> folder -> nodemon term_server.js
+  => Server On -> success
+  => localhost:3000   -> connect
+Wireless multiplayer(Same wifi only) / Multiple support
